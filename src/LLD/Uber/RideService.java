@@ -1,31 +1,37 @@
 package LLD.Uber;
 
+import LLD.Uber.DriverMatching.DriverMatchingStrategy;
+import LLD.Uber.DriverMatching.TraversalDriverFind;
+import LLD.Uber.DriverStorage.DriverStorageStrategy;
+import LLD.Uber.DriverStorage.InMemoryDriverStorage;
+import LLD.Uber.IdGeneration.IdGenerationStrategy;
+import LLD.Uber.IdGeneration.UUIDGeneration;
+
 import java.util.*;
 import java.util.concurrent.*;
 
 public class RideService {
     private static volatile RideService instance=null;
     private final Map<String,Passenger> passengers;
-    private final Map<String,Driver> drivers;
     private final Map<String,Ride> rides;
     private final Queue<Ride> requestedRides;
     private final ExecutorService notificationService;
     private final ExecutorService rideMatchingService;
-    private  DriverMatchingStrategy findDrivers;
+    private DriverMatchingStrategy findDrivers;
     private final ExecutorService driverRequestService;
-    private  IdGenerationStrategy getGeneratedId;
-  //  private DriverStorageStrategy driverStorageStrategy;
+    private IdGenerationStrategy getGeneratedId;
+    private DriverStorageStrategy driverStorageStrategy;
     private RideService(){
         passengers=new ConcurrentHashMap<>();
-        drivers = new ConcurrentHashMap<>();
         rides = new ConcurrentHashMap<>();
         requestedRides = new ConcurrentLinkedQueue<>();
         notificationService = Executors.newFixedThreadPool(5);
         rideMatchingService = Executors.newFixedThreadPool(3);
-        findDrivers=new TraversalDriverFind();
+
         driverRequestService=Executors.newFixedThreadPool(3);
         getGeneratedId=new UUIDGeneration();
-       // driverStorageStrategy=new InMemoryDriverStorage();
+        driverStorageStrategy=new InMemoryDriverStorage();
+        findDrivers=new TraversalDriverFind(driverStorageStrategy);
     }
     public static RideService getInstance(){
         if(instance==null){
@@ -37,11 +43,20 @@ public class RideService {
         }
         return instance;
     }
+    public void setDriverMatchingStrategy(DriverMatchingStrategy driverMatchingStrategy){
+        findDrivers=driverMatchingStrategy;
+    }
+    public void setIdGenerationStrategy(IdGenerationStrategy idGenerationStrategy){
+        getGeneratedId=idGenerationStrategy;
+    }
+    public void setDriverStorageStrategy(DriverStorageStrategy driverStorageStrategy){
+        this.driverStorageStrategy=driverStorageStrategy;
+    }
     public void addPassenger(Passenger passenger){ //Register passenger
         passengers.putIfAbsent(passenger.getContact(),passenger);
     }
     public void addDriver(Driver driver) { //Register drivers
-        drivers.putIfAbsent(driver.getContact(), driver);
+       driverStorageStrategy.addDriver(driver);
     }
 
     public void requestRide(Passenger passenger, Location source , Location destination){
@@ -53,7 +68,7 @@ public class RideService {
 
     }
     private void matchRide(Ride ride){
-        List<Driver> availableDrivers = findDrivers.findDrivers(ride.getSource(),drivers); // as multiple threads are calling this function , findNearest will be called by multiple threads
+        List<Driver> availableDrivers = findDrivers.findDrivers(ride.getSource()); // as multiple threads are calling this function , findNearest will be called by multiple threads
         // and it could happen that same driver can be in result for multiple rides , because this driver is closer to multiple rides
         if (availableDrivers.isEmpty()) {
             System.out.println("❌ No available drivers found for ride: " + ride.getId());
