@@ -14,7 +14,7 @@ public class RideService {
     private  DriverMatchingStrategy findDrivers;
     private final ExecutorService driverRequestService;
     private  IdGenerationStrategy getGeneratedId;
-    private DriverStorageStrategy driverStorageStrategy;
+  //  private DriverStorageStrategy driverStorageStrategy;
     private RideService(){
         passengers=new ConcurrentHashMap<>();
         drivers = new ConcurrentHashMap<>();
@@ -25,7 +25,7 @@ public class RideService {
         findDrivers=new TraversalDriverFind();
         driverRequestService=Executors.newFixedThreadPool(3);
         getGeneratedId=new UUIDGeneration();
-        driverStorageStrategy=new InMemoryDriverStorage();
+       // driverStorageStrategy=new InMemoryDriverStorage();
     }
     public static RideService getInstance(){
         if(instance==null){
